@@ -1,0 +1,16 @@
+[project]
+authors = ["Nicolas Camenisch <garnele007@gmail.com>"]
+channels = ["conda-forge"]
+name = "62600-tft"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.13.2,<3.14"
+black = ">=25.1.0,<26"
+pixi-pycharm = ">=0.0.8,<0.0.9"
+
+[pypi-dependencies]
+gdsfactory = ">=9.1.0, <10"

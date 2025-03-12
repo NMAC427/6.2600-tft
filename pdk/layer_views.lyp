@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-properties>
+ <properties>
+  <frame-color>#C0C0C0</frame-color>
+  <fill-color>#C0C0C0</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I2</dither-pattern>
+  <line-style/>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <width>1</width>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>Silicon (Si)</name>
+  <source>0/0@1</source>
+ </properties>
+
+ <properties>
+  <frame-color>#ADD8E6</frame-color>
+  <fill-color>#ADD8E6</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I3</dither-pattern>
+  <line-style/>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <width>1</width>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>Silicon Dioxide (SiO2)</name>
+  <source>1/0@1</source>
+ </properties>
+
+ <properties>
+  <frame-color>#808080</frame-color>
+  <fill-color>#808080</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I3</dither-pattern>
+  <line-style/>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <width>1</width>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>Tungsten Gate (W)</name>
+  <source>2/0@1</source>
+ </properties>
+
+ <properties>
+  <frame-color>#90EE90</frame-color>
+  <fill-color>#90EE90</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I3</dither-pattern>
+  <line-style/>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <width>1</width>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>Alumina (Al2O3)</name>
+  <source>3/0@1</source>
+ </properties>
+
+ <properties>
+  <frame-color>#0000FF</frame-color>
+  <fill-color>#0000FF</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I2</dither-pattern>
+  <line-style/>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <width>1</width>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>Indium Tin Oxide (ITO) Channel</name>
+  <source>4/0@1</source>
+ </properties>
+
+ <properties>
+  <frame-color>#FFD700</frame-color>
+  <fill-color>#FFD700</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I2</dither-pattern>
+  <line-style/>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <width>1</width>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>Nickel Contacts (Ni)</name>
+  <source>5/0@1</source>
+ </properties>
+</layer-properties>
