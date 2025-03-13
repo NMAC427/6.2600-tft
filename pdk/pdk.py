@@ -5,6 +5,7 @@ from pdk.layer_map import LAYER
 from pdk.layer_stack import layer_stack
 from gdsfactory.technology import LayerViews
 from gdsfactory.get_factories import get_cells
+from pdk import cross_section
 
 # from components import tungsten_gate, ito_channel, nickel_contacts
 
@@ -16,5 +17,6 @@ PDK = gf.Pdk(
     layers=LAYER,
     layer_stack=layer_stack,
     layer_views=layer_views,
+    cross_sections={},
     cells=get_cells(components),
 )
