@@ -22,8 +22,15 @@ def main():
     def grid_pos(x, y):
         return (x * grid_w, y * grid_h)
 
-    t_proto = transistor(l_mesa=50, l_gate=30, l_overlap=5, w_mesa=100)
-    r_proto = resistor(length=5000, width=grid_w * 1.5)
+    l_mesa = 50
+    l_gate = 30
+    l_overlap = 5
+    w_mesa = 100
+
+    t_proto = transistor(
+        l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa
+    )
+    r_proto = resistor(length=5000, width=2 * grid_w - 2 * wire_width)
 
     # PLAN: Define a grid on which to place components.
 
@@ -34,15 +41,20 @@ def main():
         port_2,
         start_straight_length=separation,
         end_straight_length=separation,
+        width=None,
         **kwargs
     ):
+        cross_section = metal_routing_ni
+        if width is not None:
+            cross_section = partial(cross_section, width=width)
+
         gf.routing.route_single(
             c,
             port_1,
             port_2,
             start_straight_length=start_straight_length,
             end_straight_length=end_straight_length,
-            cross_section=metal_routing_ni,
+            cross_section=cross_section,
             bend=gf.components.wire_corner,
             port_type="electrical",
             allow_width_mismatch=True,
@@ -54,15 +66,20 @@ def main():
         port_2,
         start_straight_length=separation,
         end_straight_length=separation,
+        width=None,
         **kwargs
     ):
+        cross_section = metal_routing_w
+        if width is not None:
+            cross_section = partial(cross_section, width=width)
+
         gf.routing.route_single(
             c,
             port_1,
             port_2,
             start_straight_length=start_straight_length,
             end_straight_length=end_straight_length,
-            cross_section=metal_routing_w,
+            cross_section=cross_section,
             bend=gf.components.wire_corner,
             port_type="electrical",
             allow_width_mismatch=True,
@@ -75,16 +92,9 @@ def main():
     # gnd.center = vdd.center
     # gnd.y -= 1000
 
-    # a_in = c << gf.components.pad(layer=LAYER.NI_CONTACTS)
-    # b_in = c << gf.components.pad(layer=LAYER.NI_CONTACTS)
-    # c_in = c << gf.components.pad(layer=LAYER.NI_CONTACTS)
-
-    # a_in.y -= 150
-    # b_in.y -= 300
-    # c_in.y -= 450
-
-    # r_0 = c << r_proto
-    # r_0.rotate(-90)
+    ############################
+    # Inter Transistor Routing #
+    ############################
 
     m_0 = c << t_proto
     m_0.rotate(-90)
@@ -131,7 +141,7 @@ def main():
             ),
             (
                 m_13.ports["d"].center[0] - grid_w / 2,
-                m_13.ports["d"].center[1] - grid_h - wire_width,
+                m_13.ports["d"].center[1] - grid_h - wire_width - separation,
             ),
         ]
     )
@@ -183,7 +193,8 @@ def main():
 
     m_12 = c << t_proto
     m_12.rotate(-90)
-    m_12.center = grid_pos(6, 1)
+    m_12.center = grid_pos(6.5, 0)
+    m_12.ymin = m_9.ymax + wire_width + separation + h_separation
 
     v_1 = c << via((wire_width, wire_width))
     v_1.connect("bot_e3", m_12, "g2", allow_width_mismatch=True)
@@ -191,20 +202,11 @@ def main():
     route_ni(v_1.ports["top_e1"], m_9.ports["s"])
     route_w(v_1.ports["bot_e3"], m_12.ports["g2"])
 
-    wp_m_12_gnd = c << gf.components.rectangle(
-        (wire_width, wire_width),
-        port_orientations=(180, -90),
-        layer=LAYER.NI_CONTACTS,
-    )
-    wp_m_12_gnd.xmin = m_12.xmax + h_separation
-    wp_m_12_gnd.ymax = m_12.ymin - separation
-    route_ni(m_12.ports["d"], wp_m_12_gnd.ports["e1"])
-
     m_10 = c << t_proto
     m_10.rotate(-90)
     m_10.center = grid_pos(6, 0)
 
-    route_w(m_8.ports["g1"], m_10.ports["g2"], start_straight_length=h_separation)
+    route_w(m_10.ports["g2"], m_8.ports["g1"], start_straight_length=h_separation)
 
     wp_m_9_m_10 = c << gf.components.rectangle(
         (wire_width, m_10.bbox().height()),
@@ -213,7 +215,7 @@ def main():
     )
 
     wp_m_9_m_10.center = grid_pos(5.5, 0)
-    wp_m_9_m_10.xmax = m_10.xmin - h_separation
+    wp_m_9_m_10.xmin = m_9.xmax + h_separation
 
     route_ni(m_9.ports["d"], wp_m_9_m_10.ports["e2"])
     route_ni(wp_m_9_m_10.ports["e1"], m_10.ports["s"])
@@ -225,76 +227,81 @@ def main():
     route_ni(m_10.ports["d"], m_11.ports["s"])
     route_ni(m_8.ports["d"], m_11.ports["d"])
 
-    p_m_12_gnd = gf.Path(
-        [
-            wp_m_12_gnd.ports["e2"].center,
-            (
-                wp_m_12_gnd.ports["e2"].center[0],
-                m_11.ports["d"].center[1] - wire_width / 2 - separation,
-            ),
-            (
-                m_11.ports["d"].center[0],
-                m_11.ports["d"].center[1] - wire_width / 2 - separation,
-            ),
-        ]
-    )
+    route_ni(m_11.ports["d"], m_12.ports["d"])
 
-    c << gf.path.extrude(p_m_12_gnd, metal_routing_ni)
+    #################
+    # Input Routing #
+    #################
 
-    # cross = c << crossing_ni()
-    # cross.center = (500, 0)
+    a_in = c << via((100, 100))
+    b_in = c << via((100, 100))
+    c_in = c << via((100, 100))
 
-    c.plot()
+    a_in.center = grid_pos(-0.5, -0.5)
+    a_in.x -= a_in.bbox().width() / 2 + 2 * h_separation
 
-    # r_0.connect("top_p1", m_0.ports["s"], allow_width_mismatch=True)
+    b_in.center = a_in.center
+    b_in.y -= 220
+    c_in.center = a_in.center
+    c_in.y += 220
 
-    # v_r0vdd = c << via((22, 22))
-    # v_r0vdd.movey(150)
-    # r_0.connect("p1", v_r0vdd.ports["be1"], allow_width_mismatch=True)
+    route_w(m_1.ports["g2"], a_in.ports["bot_e4"])
+    route_w(m_3.ports["g2"], a_in.ports["bot_e3"])
+    route_w(m_6.ports["g1"], a_in.ports["bot_e3"])
+    route_w(m_9.ports["g2"], a_in.ports["bot_e3"])
 
-    # ref1 = c.add_ref(resistor(length=100, width=50))
-    #
-    # ref2 = c.add_ref(
-    #     transistor(
-    #         l_mesa=50,
-    #         l_gate=20,
-    #         l_overlap=10,
-    #         w_mesa=20,
-    #     )
-    # )
-    #
-    # ref2.movex(100)
-    #
-    # ref3 = c.add_ref(
-    #     transistor(
-    #         l_mesa=50,
-    #         l_gate=20,
-    #         l_overlap=10,
-    #         w_mesa=20,
-    #     )
-    # )
-    #
-    # ref3.movex(100)
-    # ref3.movey(200)
+    route_w(m_2.ports["g1"], b_in.ports["bot_e3"])
+    route_w(m_2.ports["g1"], m_4.ports["g2"])
+    route_w(m_7.ports["g1"], b_in.ports["bot_e3"])
+    route_w(m_11.ports["g1"], b_in.ports["bot_e3"])
 
-    #
-    # print(r)
-    #
-    # gf.routing.route_astar(
-    #     component=c,
-    #     port1=ref1.ports["p2"],
-    #     port2=ref2.ports["g1"],
-    #     cross_section=partial(gf.cross_section.strip, width=1, layer=LAYER.W_GATE, port_types=("electrical","electrical")),
-    #     resolution=1,
-    #     distance=10,
-    #     avoid_layers=(LAYER.W_GATE, LAYER.NI_CONTACTS),
-    #     bend=gf.components.wire_corner,
-    # )
+    route_w(m_0.ports["g2"], c_in.ports["bot_e3"])
+    route_w(m_10.ports["g2"], c_in.ports["bot_e3"])
+
+    #############
+    # Resistors #
+    #############
+
+    r_0 = c << r_proto
+    r_0.rotate(-90)
+    r_0.center = grid_pos(0, 0)
+    r_0.ymin = c_in.ymax + 20
+
+    r_1 = c << r_proto
+    r_1.rotate(-90)
+    r_1.center = grid_pos(4, 0)
+    r_1.y = r_0.y
+
+    r_2 = c << r_proto
+    r_2.rotate(-90)
+    r_2.center = grid_pos(6, 0)
+    r_2.y = r_0.y
+
+    r_3 = c << r_proto
+    r_3.rotate(-90)
+    r_3.center = grid_pos(2, 0)
+    r_3.y = r_0.y
+
+    route_ni(r_0.ports["top_e2"], m_0.ports["s"])
+    route_ni(r_1.ports["top_e2"], m_5.ports["s"])
+    route_ni(r_3.ports["top_e2"], m_13.ports["s"])
+
+    if r_2.ymin < m_12.ymax + wire_width + 2 * separation:
+        r_2.ymin = m_12.ymax + wire_width + 2 * separation
+        route_ni(r_2.ports["top_e2"], m_12.ports["s"])
+    else:
+        route_m_12_r_2 = c << gf.components.straight(
+            length=r_2.ymin - m_12.ports["s"].y, cross_section=metal_routing_ni
+        )
+        route_m_12_r_2.rotate(-90)
+        route_m_12_r_2.connect("e1", m_12, "s", allow_width_mismatch=True)
+
+    route_ni(r_0.ports["top_e1"], r_3.ports["top_e1"])
+    route_ni(r_3.ports["top_e1"], r_1.ports["top_e1"])
+    route_ni(r_1.ports["top_e1"], r_2.ports["top_e1"])
 
     c.show()
-    c.plot()
-
-    c.write_gds("ito_transistor_test.gds")
+    c.write_gds("full_adder.gds")
 
 
 if __name__ == "__main__":

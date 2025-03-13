@@ -30,7 +30,7 @@ def resistor(
     v2.xmax = resistor.xmax
 
     c.add_port(
-        "bot_p1",
+        "bot_e1",
         center=(resistor.xmin, resistor.y),
         orientation=180,
         width=width,
@@ -38,7 +38,7 @@ def resistor(
         port_type="electrical",
     )
     c.add_port(
-        "bot_p2",
+        "bot_e2",
         center=(resistor.xmax, resistor.y),
         orientation=0,
         width=width,
@@ -47,7 +47,7 @@ def resistor(
     )
 
     c.add_port(
-        "top_p1",
+        "top_e1",
         center=(resistor.xmin, resistor.y),
         orientation=180,
         width=width,
@@ -55,7 +55,7 @@ def resistor(
         port_type="electrical",
     )
     c.add_port(
-        "top_p2",
+        "top_e2",
         center=(resistor.xmax, resistor.y),
         orientation=0,
         width=width,
