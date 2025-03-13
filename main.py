@@ -86,12 +86,6 @@ def main():
             **kwargs
         )
 
-    # vdd = c << gf.components.pad(layer=LAYER.NI_CONTACTS)
-    # gnd = c << gf.components.pad(layer=LAYER.NI_CONTACTS)
-
-    # gnd.center = vdd.center
-    # gnd.y -= 1000
-
     ############################
     # Inter Transistor Routing #
     ############################
@@ -299,6 +293,21 @@ def main():
     route_ni(r_0.ports["top_e1"], r_3.ports["top_e1"])
     route_ni(r_3.ports["top_e1"], r_1.ports["top_e1"])
     route_ni(r_1.ports["top_e1"], r_2.ports["top_e1"])
+
+    #############
+    # VDD / GND #
+    #############
+
+    vdd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    gnd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+
+    vdd.connect("e4", r_2, "top_e1", allow_width_mismatch=True)
+    vdd.y += wire_width + 2 * separation
+    route_ni(vdd.ports["e4"], r_2.ports["top_e1"])
+
+    gnd.connect("e2", m_6, "d", allow_width_mismatch=True)
+    gnd.y -= wire_width + 2 * separation
+    route_ni(gnd.ports["e2"], m_6.ports["d"])
 
     c.show()
     c.write_gds("full_adder.gds")
