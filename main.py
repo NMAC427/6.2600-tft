@@ -365,7 +365,7 @@ def full_adder(
     route_ni(vdd.ports["e2"], r_2.ports["top_e1"])
 
     gnd.center = grid_pos(3, 0)
-    gnd.y = b_in.y
+    gnd.ymax = b_in.y - wire_width / 2 - h_separation
     route_ni(gnd.ports["e2"], m_6.ports["d"])
 
     ###########
@@ -373,14 +373,24 @@ def full_adder(
     ###########
 
     s_out = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
-    c_out = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    c_out = c << via((100, 100))
 
     s_out.center = grid_pos(7, 0)
     s_out.x += 20
     route_ni(s_out.ports["e2"], m_12.ports["s"])
 
     c_out.center = grid_pos(3, 1)
-    c_out.y = c_in.y
+    c_out.ymin = r_3.ymax + wire_width + separation + h_separation
+
+    s_c_out_w = c << gf.components.straight(
+        length=wire_width + 2 * h_separation, cross_section=metal_routing_w
+    )
+    s_c_out_w.connect("e1", c_out, "bot_e4", allow_width_mismatch=True)
+
+    v_2 = c << via((wire_width, wire_width))
+    v_2.connect("bot_e2", s_c_out_w, "e2")
+
+    route_ni(v_2.ports["top_e4"], m_13.ports["s"])
 
     ########
     # Text #
