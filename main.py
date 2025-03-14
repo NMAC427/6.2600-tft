@@ -10,14 +10,14 @@ PDK.activate()
 
 def main():
 
-    separation = 5  # 0
+    separation = 0
     h_separation = 5
     wire_width = 50
     metal_routing_ni = partial(pdk.cross_section.metal_routing_ni, width=wire_width)
     metal_routing_w = partial(pdk.cross_section.metal_routing_w, width=wire_width)
 
-    grid_w = 200  # 170
-    grid_h = 200  # 165
+    grid_w = 175
+    grid_h = 175
 
     def grid_pos(x, y):
         return (x * grid_w, y * grid_h)
@@ -149,14 +149,22 @@ def main():
     v_0.y += separation
     v_0.x += grid_w / 2
     route_ni(v_0.ports["top_e1"], m_3.ports["s"])
-    route_w(v_0.ports["bot_e4"], m_13.ports["g2"])
+    route_w(
+        v_0.ports["bot_e4"],
+        m_13.ports["g2"],
+        start_straight_length=0,
+        end_straight_length=0,
+    )
 
     m_5 = c << t_proto
     m_5.rotate(-90)
     m_5.center = grid_pos(4, 0)
 
     route_w(
-        v_0.ports["bot_e3"], m_5.ports["g2"], start_straight_length=grid_w - wire_width
+        v_0.ports["bot_e3"],
+        m_5.ports["g2"],
+        start_straight_length=grid_w - wire_width,
+        end_straight_length=0,
     )
 
     m_6 = c << t_proto
@@ -235,9 +243,9 @@ def main():
     a_in.x -= a_in.bbox().width() / 2 + 2 * h_separation
 
     b_in.center = a_in.center
-    b_in.y -= 220
+    b_in.y -= 200
     c_in.center = a_in.center
-    c_in.y += 220
+    c_in.y += 200
 
     route_w(m_1.ports["g2"], a_in.ports["bot_e4"])
     route_w(m_3.ports["g2"], a_in.ports["bot_e3"])
@@ -301,16 +309,34 @@ def main():
     vdd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
     gnd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
 
-    vdd.connect("e4", r_2, "top_e1", allow_width_mismatch=True)
-    vdd.y += wire_width + 2 * separation
-    route_ni(vdd.ports["e4"], r_2.ports["top_e1"])
+    vdd.center = grid_pos(7, 1.5)
+    vdd.x += 20
+    route_ni(vdd.ports["e2"], r_2.ports["top_e1"])
 
-    gnd.connect("e2", m_6, "d", allow_width_mismatch=True)
-    gnd.y -= wire_width + 2 * separation
+    gnd.center = grid_pos(3, 0)
+    gnd.y = b_in.y
     route_ni(gnd.ports["e2"], m_6.ports["d"])
+
+    ###########
+    # Outputs #
+    ###########
+
+    s_out = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    c_out = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+
+    s_out.center = grid_pos(7, 0)
+    s_out.x += 20
+    route_ni(s_out.ports["e2"], m_12.ports["s"])
+
+    c_out.center = grid_pos(3, 1)
+    c_out.y = c_in.y
+
+    ###
 
     c.show()
     c.write_gds("full_adder.gds")
+
+    return c
 
 
 if __name__ == "__main__":
