@@ -44,39 +44,67 @@ def full_adder(
             l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa
         )
         t_height = t.bbox().width()
+        t_width = t.bbox().height()
 
-        if t_height >= wire_width + 2 * h_separation:
-            c.add_ports(t)
-            return c
+        if t_height < wire_width + 2 * h_separation:
+            length = (wire_width + 2 * h_separation - t_height) / 2
 
-        length = (wire_width + 2 * h_separation - t_height) / 2
+            width1 = t.ports["s"].width
+            width2 = max(width1, wire_width)
+            s_s = c << gf.components.taper(
+                length=length,
+                width1=width1,
+                width2=width2,
+                cross_section=metal_routing_ni,
+                port_names=port_names_electrical,
+                port_types=port_types_electrical,
+            )
+            d_s = c << gf.components.taper(
+                length=length,
+                width1=width1,
+                width2=width2,
+                cross_section=metal_routing_ni,
+                port_names=port_names_electrical,
+                port_types=port_types_electrical,
+            )
 
-        width1 = t.ports["s"].width
-        width2 = max(width1, wire_width)
-        s_s = c << gf.components.taper(
-            length=length,
-            width1=width1,
-            width2=width2,
-            cross_section=metal_routing_ni,
-            port_names=port_names_electrical,
-            port_types=port_types_electrical,
-        )
-        d_s = c << gf.components.taper(
-            length=length,
-            width1=width1,
-            width2=width2,
-            cross_section=metal_routing_ni,
-            port_names=port_names_electrical,
-            port_types=port_types_electrical,
-        )
+            s_s.connect("e1", t, "s", allow_width_mismatch=True)
+            d_s.connect("e1", t, "d", allow_width_mismatch=True)
+            c.add_port("s", port=s_s.ports["e2"])
+            c.add_port("d", port=d_s.ports["e2"])
+        else:
+            c.add_port("s", port=t.ports["s"])
+            c.add_port("d", port=t.ports["d"])
 
-        s_s.connect("e1", t, "s", allow_width_mismatch=True)
-        d_s.connect("e1", t, "d", allow_width_mismatch=True)
+        if t_width < wire_width + 2 * h_separation:
+            length = (wire_width + 2 * h_separation - t_width) / 2
 
-        c.add_port("g1", port=t.ports["g1"])
-        c.add_port("g2", port=t.ports["g2"])
-        c.add_port("s", port=s_s.ports["e2"])
-        c.add_port("d", port=d_s.ports["e2"])
+            width1 = t.ports["g1"].width
+            width2 = wire_width
+            g1_s = c << gf.components.taper(
+                length=length,
+                width1=width1,
+                width2=width2,
+                cross_section=metal_routing_w,
+                port_names=port_names_electrical,
+                port_types=port_types_electrical,
+            )
+            g2_s = c << gf.components.taper(
+                length=length,
+                width1=width1,
+                width2=width2,
+                cross_section=metal_routing_w,
+                port_names=port_names_electrical,
+                port_types=port_types_electrical,
+            )
+
+            g1_s.connect("e1", t, "g1", allow_width_mismatch=True)
+            g2_s.connect("e1", t, "g2", allow_width_mismatch=True)
+            c.add_port("g1", port=g1_s.ports["e2"])
+            c.add_port("g2", port=g2_s.ports["e2"])
+        else:
+            c.add_port("g1", port=t.ports["g1"])
+            c.add_port("g2", port=t.ports["g2"])
 
         return c
 
@@ -415,22 +443,20 @@ def full_adder(
 def main():
     c = gf.Component()
 
-    # variants = itertools.product(
-    #     [20, 40, 50, 60],
-    #     [10, 20, 30, 40],
-    #     [5, 10],
-    #     [10, 20, 50, 100]
-    # )
-    #
-    # full_adders = [
-    #     full_adder(l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa)
-    #     for (l_mesa, l_gate, l_overlap, w_mesa) in variants
-    #     if l_mesa > l_gate
-    # ]
-    #
-    # c << gf.grid(gf.pack(full_adders, spacing=50))
+    variants = itertools.product(
+        [2, 5, 10],
+        [10, 20, 50, 100],
+        [5, 10, 20, 30],
+    )
 
-    c << full_adder()
+    full_adders = [
+        full_adder(l_mesa=l_ov * 2 + l_g - 1, l_gate=l_g, l_overlap=l_ov, w_mesa=w)
+        for (l_ov, w, l_g) in variants
+    ]
+
+    c << gf.grid(gf.pack(full_adders, spacing=50))
+
+    # c << full_adder()
 
     c.show()
     c.write_gds("full_adder.gds")
