@@ -1,38 +1,89 @@
 import gdsfactory as gf
 from functools import partial
+import itertools
 
 import pdk.cross_section
 from pdk import PDK
 from pdk.components import *
+from gdsfactory.cross_section import (
+    port_names_electrical,
+    port_types_electrical,
+)
 
 PDK.activate()
 
 
-def main():
-
-    separation = 0
-    h_separation = 5
-    wire_width = 50
-    metal_routing_ni = partial(pdk.cross_section.metal_routing_ni, width=wire_width)
-    metal_routing_w = partial(pdk.cross_section.metal_routing_w, width=wire_width)
+@gf.cell
+def full_adder(
+    l_mesa=50,
+    l_gate=30,
+    l_overlap=5,
+    w_mesa=100,
+):
 
     grid_w = 175
     grid_h = 175
+    wire_width = 50
+
+    separation = 0
+    h_separation = 5
+    metal_routing_ni = partial(pdk.cross_section.metal_routing_ni, width=wire_width)
+    metal_routing_w = partial(pdk.cross_section.metal_routing_w, width=wire_width)
+
+    r_proto = resistor(length=5000, width=1.5 * grid_w)
+
+    @gf.cell
+    def _transistor(
+        l_mesa: float,
+        l_gate: float,
+        l_overlap: float,
+        w_mesa: float,
+    ):
+        c = gf.Component()
+        t = c << transistor(
+            l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa
+        )
+        t_height = t.bbox().width()
+
+        if t_height >= wire_width + 2 * h_separation:
+            c.add_ports(t)
+            return c
+
+        length = (wire_width + 2 * h_separation - t_height) / 2
+
+        width1 = t.ports["s"].width
+        width2 = max(width1, wire_width)
+        s_s = c << gf.components.taper(
+            length=length,
+            width1=width1,
+            width2=width2,
+            cross_section=metal_routing_ni,
+            port_names=port_names_electrical,
+            port_types=port_types_electrical,
+        )
+        d_s = c << gf.components.taper(
+            length=length,
+            width1=width1,
+            width2=width2,
+            cross_section=metal_routing_ni,
+            port_names=port_names_electrical,
+            port_types=port_types_electrical,
+        )
+
+        s_s.connect("e1", t, "s", allow_width_mismatch=True)
+        d_s.connect("e1", t, "d", allow_width_mismatch=True)
+
+        c.add_port("g1", port=t.ports["g1"])
+        c.add_port("g2", port=t.ports["g2"])
+        c.add_port("s", port=s_s.ports["e2"])
+        c.add_port("d", port=d_s.ports["e2"])
+
+        return c
+
+    t_proto = _transistor(l_mesa, l_gate, l_overlap, w_mesa)
 
     def grid_pos(x, y):
         return (x * grid_w, y * grid_h)
-
-    l_mesa = 50
-    l_gate = 30
-    l_overlap = 5
-    w_mesa = 100
-
-    t_proto = transistor(
-        l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa
-    )
-    r_proto = resistor(length=5000, width=2 * grid_w - 2 * wire_width)
-
-    # PLAN: Define a grid on which to place components.
 
     c = gf.Component()
 
@@ -42,7 +93,7 @@ def main():
         start_straight_length=separation,
         end_straight_length=separation,
         width=None,
-        **kwargs
+        **kwargs,
     ):
         cross_section = metal_routing_ni
         if width is not None:
@@ -58,7 +109,7 @@ def main():
             bend=gf.components.wire_corner,
             port_type="electrical",
             allow_width_mismatch=True,
-            **kwargs
+            **kwargs,
         )
 
     def route_w(
@@ -67,7 +118,7 @@ def main():
         start_straight_length=separation,
         end_straight_length=separation,
         width=None,
-        **kwargs
+        **kwargs,
     ):
         cross_section = metal_routing_w
         if width is not None:
@@ -83,7 +134,7 @@ def main():
             bend=gf.components.wire_corner,
             port_type="electrical",
             allow_width_mismatch=True,
-            **kwargs
+            **kwargs,
         )
 
     ############################
@@ -195,7 +246,7 @@ def main():
 
     m_12 = c << t_proto
     m_12.rotate(-90)
-    m_12.center = grid_pos(6.5, 0)
+    m_12.center = grid_pos(6.5, 0.5)
     m_12.ymin = m_9.ymax + wire_width + separation + h_separation
 
     v_1 = c << via((wire_width, wire_width))
@@ -258,7 +309,7 @@ def main():
     route_w(m_11.ports["g1"], b_in.ports["bot_e3"])
 
     route_w(m_0.ports["g2"], c_in.ports["bot_e3"])
-    route_w(m_10.ports["g2"], c_in.ports["bot_e3"])
+    route_w(m_10.ports["g2"], c_in.ports["bot_e3"], start_straight_length=h_separation)
 
     #############
     # Resistors #
@@ -331,12 +382,48 @@ def main():
     c_out.center = grid_pos(3, 1)
     c_out.y = c_in.y
 
-    ###
+    ########
+    # Text #
+    ########
+
+    for layer in [LAYER.W_GATE, LAYER.AL2O3, LAYER.NI_CONTACTS]:
+        text = c << gf.components.text(
+            text=f"Lm {l_mesa}\n"
+            + f"Lg {l_gate}\n"
+            + f"Ov {l_overlap}\n"
+            + f"Wm {w_mesa}\n",
+            size=15,
+            layer=layer,
+        )
+
+        text.xmin = s_out.xmin
+        text.ymax = s_out.ymin - 20
+
+    return c
+
+
+def main():
+    c = gf.Component()
+
+    # variants = itertools.product(
+    #     [20, 40, 50, 60],
+    #     [10, 20, 30, 40],
+    #     [5, 10],
+    #     [10, 20, 50, 100]
+    # )
+    #
+    # full_adders = [
+    #     full_adder(l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa)
+    #     for (l_mesa, l_gate, l_overlap, w_mesa) in variants
+    #     if l_mesa > l_gate
+    # ]
+    #
+    # c << gf.grid(gf.pack(full_adders, spacing=50))
+
+    c << full_adder()
 
     c.show()
     c.write_gds("full_adder.gds")
-
-    return c
 
 
 if __name__ == "__main__":
