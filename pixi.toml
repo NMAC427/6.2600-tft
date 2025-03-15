@@ -11,6 +11,7 @@ version = "0.1.0"
 python = ">=3.13.2,<3.14"
 black = ">=25.1.0,<26"
 pixi-pycharm = ">=0.0.8,<0.0.9"
+isort = ">=6.0.1,<7"
 
 [pypi-dependencies]
 gdsfactory = ">=9.1.0, <10"

@@ -1,27 +1,115 @@
+import itertools
+from functools import partial
+
 import gdsfactory as gf
 import kfactory
-from functools import partial
-import itertools
-
-import pdk.cross_section
-from pdk import PDK
-from pdk.components import *
+import numpy as np
 from gdsfactory.cross_section import (
     port_names_electrical,
     port_types_electrical,
 )
 
+import pdk.cross_section
+from pdk import PDK
+from pdk.components import *
+
 PDK.activate()
+
+
+def compute_l_mesa(l_gate: float, l_overlap: float):
+    return l_overlap * 2 + l_gate - 1
+
+
+@gf.cell
+def padded_transistor(
+    l_gate: float,
+    l_overlap: float,
+    w_mesa: float,
+    wire_width: float,
+    h_separation: float,
+):
+    l_mesa = compute_l_mesa(l_gate, l_overlap)
+
+    c = gf.Component()
+    t = c << transistor(
+        l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa
+    )
+    t_height = t.bbox().width()
+    t_width = t.bbox().height()
+
+    if t_height < wire_width + 2 * h_separation:
+        length = (wire_width + 2 * h_separation - t_height) / 2
+
+        width1 = t.ports["s"].width
+        width2 = max(width1, wire_width)
+        s_s = c << gf.components.taper(
+            length=length,
+            width1=width1,
+            width2=width2,
+            cross_section=metal_routing_ni,
+            port_names=port_names_electrical,
+            port_types=port_types_electrical,
+        )
+        d_s = c << gf.components.taper(
+            length=length,
+            width1=width1,
+            width2=width2,
+            cross_section=metal_routing_ni,
+            port_names=port_names_electrical,
+            port_types=port_types_electrical,
+        )
+
+        s_s.connect("e1", t, "s", allow_width_mismatch=True)
+        d_s.connect("e1", t, "d", allow_width_mismatch=True)
+        c.add_port("s", port=s_s.ports["e2"])
+        c.add_port("d", port=d_s.ports["e2"])
+    else:
+        c.add_port("s", port=t.ports["s"])
+        c.add_port("d", port=t.ports["d"])
+
+    if t_width < wire_width + 2 * h_separation:
+        length = (wire_width + 2 * h_separation - t_width) / 2
+
+        width1 = t.ports["g1"].width
+        width2 = wire_width
+        g1_s = c << gf.components.taper(
+            length=length,
+            width1=width1,
+            width2=width2,
+            cross_section=metal_routing_w,
+            port_names=port_names_electrical,
+            port_types=port_types_electrical,
+        )
+        g2_s = c << gf.components.taper(
+            length=length,
+            width1=width1,
+            width2=width2,
+            cross_section=metal_routing_w,
+            port_names=port_names_electrical,
+            port_types=port_types_electrical,
+        )
+
+        g1_s.connect("e1", t, "g1", allow_width_mismatch=True)
+        g2_s.connect("e1", t, "g2", allow_width_mismatch=True)
+        c.add_port("g1", port=g1_s.ports["e2"])
+        c.add_port("g2", port=g2_s.ports["e2"])
+    else:
+        c.add_port("g1", port=t.ports["g1"])
+        c.add_port("g2", port=t.ports["g2"])
+
+    c.rotate(-90)
+    c.flatten()
+    return c
 
 
 @gf.cell
 def full_adder(
-    l_mesa=50,
     l_gate=30,
     l_overlap=5,
     w_mesa=100,
     disabled=None,
     split_vdd=False,
+    r_type=("W", 5000),
 ):
     disabled = disabled or []
 
@@ -34,86 +122,12 @@ def full_adder(
     metal_routing_ni = partial(pdk.cross_section.metal_routing_ni, width=wire_width)
     metal_routing_w = partial(pdk.cross_section.metal_routing_w, width=wire_width)
 
-    r_proto = resistor(length=5000, width=1.5 * grid_w)
+    if r_type[0] == "ITO":
+        r_proto = resistor_ito(length=r_type[1], width=wire_width)
+    else:
+        r_proto = resistor(length=r_type[1], width=1.5 * grid_w)
 
-    @gf.cell
-    def _transistor(
-        l_mesa: float,
-        l_gate: float,
-        l_overlap: float,
-        w_mesa: float,
-    ):
-        c = gf.Component()
-        t = c << transistor(
-            l_mesa=l_mesa, l_gate=l_gate, l_overlap=l_overlap, w_mesa=w_mesa
-        )
-        t_height = t.bbox().width()
-        t_width = t.bbox().height()
-
-        if t_height < wire_width + 2 * h_separation:
-            length = (wire_width + 2 * h_separation - t_height) / 2
-
-            width1 = t.ports["s"].width
-            width2 = max(width1, wire_width)
-            s_s = c << gf.components.taper(
-                length=length,
-                width1=width1,
-                width2=width2,
-                cross_section=metal_routing_ni,
-                port_names=port_names_electrical,
-                port_types=port_types_electrical,
-            )
-            d_s = c << gf.components.taper(
-                length=length,
-                width1=width1,
-                width2=width2,
-                cross_section=metal_routing_ni,
-                port_names=port_names_electrical,
-                port_types=port_types_electrical,
-            )
-
-            s_s.connect("e1", t, "s", allow_width_mismatch=True)
-            d_s.connect("e1", t, "d", allow_width_mismatch=True)
-            c.add_port("s", port=s_s.ports["e2"])
-            c.add_port("d", port=d_s.ports["e2"])
-        else:
-            c.add_port("s", port=t.ports["s"])
-            c.add_port("d", port=t.ports["d"])
-
-        if t_width < wire_width + 2 * h_separation:
-            length = (wire_width + 2 * h_separation - t_width) / 2
-
-            width1 = t.ports["g1"].width
-            width2 = wire_width
-            g1_s = c << gf.components.taper(
-                length=length,
-                width1=width1,
-                width2=width2,
-                cross_section=metal_routing_w,
-                port_names=port_names_electrical,
-                port_types=port_types_electrical,
-            )
-            g2_s = c << gf.components.taper(
-                length=length,
-                width1=width1,
-                width2=width2,
-                cross_section=metal_routing_w,
-                port_names=port_names_electrical,
-                port_types=port_types_electrical,
-            )
-
-            g1_s.connect("e1", t, "g1", allow_width_mismatch=True)
-            g2_s.connect("e1", t, "g2", allow_width_mismatch=True)
-            c.add_port("g1", port=g1_s.ports["e2"])
-            c.add_port("g2", port=g2_s.ports["e2"])
-        else:
-            c.add_port("g1", port=t.ports["g1"])
-            c.add_port("g2", port=t.ports["g2"])
-
-        c.rotate(-90)
-        return c
-
-    t_proto = _transistor(l_mesa, l_gate, l_overlap, w_mesa)
+    t_proto = padded_transistor(l_gate, l_overlap, w_mesa, wire_width, h_separation)
 
     @gf.cell
     def without_ito(component):
@@ -445,18 +459,19 @@ def full_adder(
             (old_c.bbox().width(), old_c.bbox().height()), layer=LAYER.SI
         )
         boundary.center = old_c.center
+        c.info["invalid"] = True
 
     ########
     # Text #
     ########
 
-    for layer in [LAYER.W_GATE, LAYER.AL2O3, LAYER.NI_CONTACTS]:
+    for layer in [LAYER.W_GATE, LAYER.NI_CONTACTS]:
         text = c << gf.components.text(
-            text=f"Lm {l_mesa}\n"
-            + f"Lg {l_gate}\n"
+            text=f"Lg {l_gate}\n"
             + f"Ov {l_overlap}\n"
             + f"Wm {w_mesa}\n"
-            + f"D {' '.join(disabled).replace('_', '')}\n",
+            + f"R {r_type[0]} {r_type[1]}\n"
+            + (f"D {' '.join(disabled).replace('_', '')}\n" if disabled else ""),
             size=15,
             layer=layer,
         )
@@ -467,30 +482,252 @@ def full_adder(
     return c
 
 
+## Test Patterns
+
+
+@gf.cell
+def transistor_test(
+    l_gate=30,
+    l_overlap=5,
+    w_mesa=100,
+):
+    """
+    Transistor test structure
+    """
+    l_mesa = compute_l_mesa(l_gate, l_overlap)
+
+    c = gf.Component()
+    t = c << transistor(l_mesa, l_gate, l_overlap, w_mesa)
+
+    p_s = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    p_d = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    p_g = c << via((100, 100))
+
+    p_g.connect("bot_e4", t, "g1", allow_width_mismatch=True)
+
+    p_s.xmax = t.xmin
+    p_s.ymax = t.ymax - 4
+
+    p_d.xmin = t.xmax
+    p_d.ymax = t.ymax - 4
+
+    for layer in [LAYER.W_GATE, LAYER.NI_CONTACTS]:
+        text = c << gf.components.text(
+            text=f"Lg {l_gate}\n" + f"Ov {l_overlap}\n" + f"Wm {w_mesa}\n",
+            size=10,
+            layer=layer,
+        )
+
+        text.xmin = p_g.xmax + 5
+        text.ymax = p_g.ymax - 5
+
+    return c
+
+
+@gf.cell
+def resistor_w_test(length=100):
+    c = gf.Component()
+    r = c << resistor(length=length, width=int(np.sqrt(length) * 3))
+
+    p_1 = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    p_2 = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+
+    p_1.connect("e1", r, "top_e1", allow_width_mismatch=True)
+    p_2.connect("e1", r, "top_e2", allow_width_mismatch=True)
+
+    for layer in [LAYER.W_GATE, LAYER.NI_CONTACTS]:
+        text = c << gf.components.text(
+            text=f"W\nL {length}",
+            size=10,
+            layer=layer,
+        )
+
+        text.xmin = p_1.xmin + 5
+        text.ymin = p_1.ymax + 5
+
+    return c
+
+
+@gf.cell
+def resistor_ito_test(length=10):
+    c = gf.Component()
+    r = c << resistor_ito(length=length, width=100)
+
+    p_1 = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    p_2 = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+
+    p_1.connect("e1", r, "top_e1", allow_width_mismatch=True)
+    p_2.connect("e1", r, "top_e2", allow_width_mismatch=True)
+
+    for layer in [LAYER.W_GATE, LAYER.NI_CONTACTS]:
+        text = c << gf.components.text(
+            text=f"ITO\nL {length}",
+            size=10,
+            layer=layer,
+        )
+
+        text.xmin = p_1.xmin + 5
+        text.ymin = p_1.ymax + 5
+
+    return c
+
+
+@gf.cell
+def inverter_test(l_gate=30, l_overlap=5, w_mesa=100, n_transistors=1):
+    c = gf.Component()
+    r = c << resistor(5000, width=300)
+    r.rotate(90)
+
+    prev_cell = r
+    prev_port_name = "top_e1"
+    for _ in range(n_transistors):
+        t = c << padded_transistor(l_gate, l_overlap, w_mesa, 100, 5)
+        t.connect("s", prev_cell, prev_port_name, allow_width_mismatch=True)
+
+        p_g = c << via((100, 100))
+        p_g.connect("bot_e3", t, "g2", allow_width_mismatch=True)
+
+        prev_cell = t
+        prev_port_name = "d"
+
+    p_v = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    p_s = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    p_d = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+
+    p_v.connect("e4", r, "top_e2", allow_width_mismatch=True)
+    p_d.connect("e2", prev_cell, prev_port_name, allow_width_mismatch=True)
+
+    p_s.connect("e1", r, "top_e1", allow_width_mismatch=True, allow_layer_mismatch=True)
+    p_s.xmin = prev_cell.xmax + 5
+
+    for layer in [LAYER.W_GATE, LAYER.NI_CONTACTS]:
+        text = c << gf.components.text(
+            text=f"Lg {l_gate}\n" + f"Ov {l_overlap}\n" + f"Wm {w_mesa}\n",
+            size=10,
+            layer=layer,
+        )
+
+        text.xmin = p_v.xmax + 5
+        text.ymax = p_v.ymax - 5
+
+    return c
+
+
 def main():
     c = gf.Component()
 
-    t_variants = itertools.product(
-        [2, 5, 10, 20],  # l_ov
-        [5, 10, 20, 30],  # l_g
-        [10, 20, 50, 100],  # w
+    t_variants = list(
+        itertools.product(
+            [5, 10, 20, 40],  # l_g
+            [2, 5, 10, 20],  # l_ov
+            [10, 20, 50, 100],  # w
+        )
     )
 
-    t_variants = [(l_ov * 2 + l_g - 1, l_g, l_ov, w) for l_ov, l_g, w in t_variants]
-
+    # Full Adder
     full_adders = [
-        full_adder(l_mesa, l_gate, l_overlap, w_mesa)
-        for (l_mesa, l_gate, l_overlap, w_mesa) in t_variants
+        full_adder(l_gate, l_overlap, w_mesa)
+        for (l_gate, l_overlap, w_mesa) in t_variants
+    ]
+    full_adders = [x for x in full_adders if "invalid" not in x.info]
+    full_adder_test_structure = gf.grid(
+        full_adders, shape=(len(full_adders), 8), spacing=(50, 50)
+    )
+
+    # Full Adder - Resistor
+    r_full_adder_variants = list(
+        itertools.product(
+            [5, 10, 20, 40],  # l_g
+            [5, 10],  # l_ov
+            [50, 100],  # w
+            [("W", 500), ("ITO", 1), ("ITO", 5), ("ITO", 10)],  # r_type
+        )
+    )
+
+    r_full_adders = [
+        full_adder(l_gate, l_overlap, w_mesa, r_type=r_type)
+        for (l_gate, l_overlap, w_mesa, r_type) in r_full_adder_variants
+    ]
+    r_full_adders = [x for x in r_full_adders if "invalid" not in x.info]
+    r_full_adder_test_structure = gf.grid(
+        r_full_adders, shape=(len(r_full_adders), 8), spacing=(50, 50)
+    )
+
+    # Full Adder - VDD
+    vdd_full_adder_variants = list(
+        itertools.product(
+            [5, 10, 20, 40],  # l_g
+            [5, 10],  # l_ov
+            [50, 100],  # w
+        )
+    )
+
+    vdd_full_adders = [
+        full_adder(l_gate, l_overlap, w_mesa, split_vdd=True)
+        for (l_gate, l_overlap, w_mesa) in vdd_full_adder_variants
+    ]
+    vdd_full_adders = [x for x in vdd_full_adders if "invalid" not in x.info]
+    vdd_full_adder_test_structure = gf.grid(
+        vdd_full_adders, shape=(len(vdd_full_adders), 8), spacing=(50, 50)
+    )
+
+    # Transistor
+    transistors = [
+        transistor_test(l_gate, l_overlap, w_mesa)
+        for (l_gate, l_overlap, w_mesa) in t_variants
     ]
 
-    c << gf.grid(gf.pack(full_adders, spacing=50))
+    transistor_test_structure = gf.grid(
+        transistors, shape=(len(transistors), 8), spacing=(50, 50)
+    )
 
-    # c << full_adder(
-    #     l_mesa=70,
-    #     l_overlap=30,
-    #     disabled=["m_0", "m_1"],
-    #     split_vdd=True
-    # )
+    # Resistor
+    r_variants_w = [100, 200, 500, 1000, 2000, 5000, 10000]
+    resistors_w = [resistor_w_test(l) for l in r_variants_w]
+
+    r_variants_ito = [1, 2, 5, 10, 20, 50, 100]
+    resistors_ito = [resistor_ito_test(l) for l in r_variants_ito]
+
+    resistor_test_structure = gf.grid(
+        np.transpose([resistors_w, resistors_ito]).flatten().tolist(),
+        shape=(len(resistors_w), 2),
+        spacing=50,
+    )
+
+    # Inverters & NAND Gates
+
+    inverters = [
+        inverter_test(l_gate, l_overlap, w_mesa, n_transistors=1)
+        for (l_gate, l_overlap, w_mesa) in t_variants
+    ]
+    inverter_test_structure = gf.grid(
+        inverters, shape=(len(inverters), 8), spacing=(50, 50)
+    )
+
+    nand_gates = [
+        inverter_test(l_gate, l_overlap, w_mesa, n_transistors=2)
+        for (l_gate, l_overlap, w_mesa) in t_variants
+    ]
+    nand_gates_test_structure = gf.grid(
+        nand_gates, shape=(len(nand_gates), 8), spacing=(50, 50)
+    )
+
+    c << gf.grid(
+        gf.pack(
+            [
+                full_adder_test_structure,
+                r_full_adder_test_structure,
+                vdd_full_adder_test_structure,
+                transistor_test_structure,
+                transistor_test_structure,
+                resistor_test_structure,
+                resistor_test_structure,
+                inverter_test_structure,
+                nand_gates_test_structure,
+            ],
+            spacing=150,
+        )
+    )
 
     c.show()
     c.write_gds("full_adder.gds")

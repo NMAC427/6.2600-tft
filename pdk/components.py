@@ -1,7 +1,95 @@
 import gdsfactory as gf
+import numpy as np
 
 from pdk.cross_section import metal_routing_ni, metal_routing_w
 from pdk.layer_map import LAYER
+
+
+@gf.cell
+def resistance_meander(
+    pad_size=(50.0, 50.0),
+    num_squares: int = 1000,
+    width: float = 1.0,
+    res_layer="MTOP",
+    pad_layer="MTOP",
+) -> gf.Component:
+    """Return meander to test resistance.
+
+    based on phidl.geometry
+
+    Args:
+        pad_size: Size of the two matched impedance pads (microns).
+        num_squares: Number of squares comprising the resonator wire.
+        width: The width of the squares (microns).
+        res_layer: resistance layer.
+        pad_layer: pad layer.
+    """
+    x = pad_size[0]
+    z = pad_size[1]
+
+    # Checking validity of input
+    if x <= 0 or z <= 0:
+        raise ValueError("Pad must have positive, real dimensions")
+    elif width > z:
+        raise ValueError("Width of cell cannot be greater than height of pad")
+    elif num_squares <= 0:
+        raise ValueError("Number of squares must be a positive real number")
+    elif width <= 0:
+        raise ValueError("Width of cell must be a positive real number")
+
+    # Performing preliminary calculations
+    num_rows = int(np.floor(z / (2 * width)))
+    if num_rows % 2 == 0:
+        num_rows -= 1
+    num_columns = num_rows - 1
+    squares_in_row = (num_squares - num_columns - 2) / num_rows
+
+    # Compensating for weird edge cases
+    if squares_in_row < 1:
+        num_rows = round(num_rows / 2) - 2
+        squares_in_row = 1
+    if width * 2 > z:
+        num_rows = 1
+        squares_in_row = num_squares - 2
+
+    length_row = squares_in_row * width
+
+    # Creating row/column corner combination structure
+    T = gf.Component()
+    Row = gf.c.rectangle(size=(length_row, width), layer=res_layer)
+    Col = gf.c.rectangle(size=(width, width), layer=res_layer)
+
+    T.add_ref(Row)
+    col = T.add_ref(Col)
+    col.dmove((length_row - width, -width))
+
+    # Creating entire straight net
+    N = gf.Component()
+    n = 1
+    for i in range(num_rows):
+        d = N.add_ref(T) if i != num_rows - 1 else N.add_ref(Row)
+        if n % 2 == 0:
+            d.dmirror_x(d.dx)
+        d.dmovey(-(n - 1) * T.dysize)
+        n += 1
+    ref = N.add_ref(Col)
+    ref.dmovex(-width)
+
+    end = N.add_ref(Col)
+    end.dmovey(-(n - 2) * T.dysize)
+    end.dmovex(length_row)
+
+    # Creating pads
+    P = gf.Component()
+    pad = gf.c.rectangle(size=(x, z), layer=pad_layer)
+    pad1 = P.add_ref(pad)
+    pad1.dmovex(-x - width)
+    pad2 = P.add_ref(pad)
+    pad2.dmovex(length_row + width)
+    net = P.add_ref(N)
+    net.dymin = pad1.dymin
+    P.flatten()
+    return P
 
 
 @gf.cell
@@ -13,7 +101,7 @@ def resistor(
     c = gf.Component()
 
     pad_size = (12, width)
-    resistor = c << gf.components.resistance_meander(
+    resistor = c << resistance_meander(
         pad_size=pad_size,
         num_squares=length,
         width=2,
@@ -63,6 +151,78 @@ def resistor(
         port_type="electrical",
     )
 
+    c.flatten()
+    return c
+
+
+@gf.cell
+def resistor_ito(length=1, width=20):
+    c = gf.Component()
+
+    if length * 3 < width or length <= 10:
+        offset = 6
+        trace_width = 2 if length >= 10 else 5
+        pad_size = (12, width)
+
+        r_size = (length * trace_width + 2 * offset, trace_width)
+        resistor = c << gf.components.compass(r_size, layer=LAYER.ITO_CHANNEL)
+    else:
+        offset = 6
+        pad_size = (12, width)
+        resistor = c << resistance_meander(
+            pad_size=(4, width),
+            num_squares=length,
+            width=5,
+            res_layer=LAYER.ITO_CHANNEL,
+            pad_layer=LAYER.ITO_CHANNEL,
+        )
+
+    print(length, width, pad_size)
+    v1 = c << via(pad_size)
+    v2 = c << via(pad_size)
+
+    v1.y = resistor.y
+    v2.y = resistor.y
+    v1.xmax = resistor.xmin + offset
+    v2.xmin = resistor.xmax - offset
+
+    port_width = pad_size[1]
+
+    c.add_port(
+        "bot_e1",
+        center=(c.xmin, c.y),
+        orientation=180,
+        width=port_width,
+        layer=LAYER.W_GATE,
+        port_type="electrical",
+    )
+    c.add_port(
+        "bot_e2",
+        center=(c.xmax, c.y),
+        orientation=0,
+        width=port_width,
+        layer=LAYER.W_GATE,
+        port_type="electrical",
+    )
+
+    c.add_port(
+        "top_e1",
+        center=(c.xmin, c.y),
+        orientation=180,
+        width=port_width,
+        layer=LAYER.NI_CONTACTS,
+        port_type="electrical",
+    )
+    c.add_port(
+        "top_e2",
+        center=(c.xmax, c.y),
+        orientation=0,
+        width=port_width,
+        layer=LAYER.NI_CONTACTS,
+        port_type="electrical",
+    )
+
+    c.flatten()
     return c
 
 
@@ -166,7 +326,6 @@ def crossing_ni() -> gf.Component:
     c.add_port("e2", port=v1.ports["top_e2"])
     c.add_port("e4", port=v2.ports["top_e4"])
 
-    # c.draw_ports()
     return c
 
 

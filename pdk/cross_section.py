@@ -4,9 +4,9 @@ from gdsfactory.config import CONF, ErrorType
 from gdsfactory.cross_section import (
     CrossSection,
     cross_section,
-    xsection,
     port_names_electrical,
     port_types_electrical,
+    xsection,
 )
 
 
