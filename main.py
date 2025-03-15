@@ -1,4 +1,5 @@
 import gdsfactory as gf
+import kfactory
 from functools import partial
 import itertools
 
@@ -19,7 +20,10 @@ def full_adder(
     l_gate=30,
     l_overlap=5,
     w_mesa=100,
+    disabled=None,
+    split_vdd=False,
 ):
+    disabled = disabled or []
 
     grid_w = 175
     grid_h = 175
@@ -106,9 +110,23 @@ def full_adder(
             c.add_port("g1", port=t.ports["g1"])
             c.add_port("g2", port=t.ports["g2"])
 
+        c.rotate(-90)
         return c
 
     t_proto = _transistor(l_mesa, l_gate, l_overlap, w_mesa)
+
+    @gf.cell
+    def without_ito(component):
+        c = gf.Component(component.name + "_dis")
+        c.kdb_cell.copy_tree(component.kdb_cell)
+        c.add_ports(component.ports)
+        c.remove_layers([LAYER.ITO_CHANNEL])
+        return c
+
+    def get_transistor(name: str):
+        if name in disabled:
+            return without_ito(t_proto)
+        return t_proto
 
     def grid_pos(x, y):
         return (x * grid_w, y * grid_h)
@@ -169,36 +187,30 @@ def full_adder(
     # Inter Transistor Routing #
     ############################
 
-    m_0 = c << t_proto
-    m_0.rotate(-90)
+    m_0 = c << get_transistor("m_0")
     m_0.center = grid_pos(1, 0)
 
-    m_1 = c << t_proto
-    m_1.rotate(-90)
+    m_1 = c << get_transistor("m_1")
     m_1.center = grid_pos(0, -1)
 
-    m_2 = c << t_proto
-    m_2.rotate(-90)
+    m_2 = c << get_transistor("m_2")
     m_2.center = grid_pos(1, -1)
 
     route_ni(m_0.ports["d"], m_2.ports["s"])
     route_ni(m_1.ports["s"], m_2.ports["s"])
     route_ni(m_1.ports["d"], m_2.ports["d"])
 
-    m_3 = c << t_proto
-    m_3.rotate(-90)
+    m_3 = c << get_transistor("m_3")
     m_3.center = grid_pos(2, 0)
 
-    m_4 = c << t_proto
-    m_4.rotate(-90)
+    m_4 = c << get_transistor("m_4")
     m_4.center = grid_pos(2, -1)
 
     route_ni(m_3.ports["d"], m_4.ports["s"])
     route_ni(m_3.ports["s"], m_0.ports["s"])
     route_ni(m_2.ports["d"], m_4.ports["d"])
 
-    m_13 = c << t_proto
-    m_13.rotate(-90)
+    m_13 = c << get_transistor("m_13")
     m_13.center = grid_pos(3, 0)
 
     p_m_13_gnd = gf.Path(
@@ -235,8 +247,7 @@ def full_adder(
         end_straight_length=0,
     )
 
-    m_5 = c << t_proto
-    m_5.rotate(-90)
+    m_5 = c << get_transistor("m_5")
     m_5.center = grid_pos(4, 0)
 
     route_w(
@@ -246,16 +257,13 @@ def full_adder(
         end_straight_length=0,
     )
 
-    m_6 = c << t_proto
-    m_6.rotate(-90)
+    m_6 = c << get_transistor("m_6")
     m_6.center = grid_pos(3, -1)
 
-    m_7 = c << t_proto
-    m_7.rotate(-90)
+    m_7 = c << get_transistor("m_7")
     m_7.center = grid_pos(4, -1)
 
-    m_8 = c << t_proto
-    m_8.rotate(-90)
+    m_8 = c << get_transistor("m_8")
     m_8.center = grid_pos(5, -1)
 
     route_ni(m_5.ports["d"], m_7.ports["s"])
@@ -266,14 +274,12 @@ def full_adder(
     route_ni(m_6.ports["d"], m_7.ports["d"])
     route_ni(m_7.ports["d"], m_8.ports["d"])
 
-    m_9 = c << t_proto
-    m_9.rotate(-90)
+    m_9 = c << get_transistor("m_9")
     m_9.center = grid_pos(5, 0)
 
     route_ni(m_5.ports["s"], m_9.ports["s"])
 
-    m_12 = c << t_proto
-    m_12.rotate(-90)
+    m_12 = c << get_transistor("m_12")
     m_12.center = grid_pos(6.5, 0.5)
     m_12.ymin = m_9.ymax + wire_width + separation + h_separation
 
@@ -283,8 +289,7 @@ def full_adder(
     route_ni(v_1.ports["top_e1"], m_9.ports["s"])
     route_w(v_1.ports["bot_e3"], m_12.ports["g2"])
 
-    m_10 = c << t_proto
-    m_10.rotate(-90)
+    m_10 = c << get_transistor("m_10")
     m_10.center = grid_pos(6, 0)
 
     route_w(m_10.ports["g2"], m_8.ports["g1"], start_straight_length=h_separation)
@@ -301,8 +306,7 @@ def full_adder(
     route_ni(m_9.ports["d"], wp_m_9_m_10.ports["e2"])
     route_ni(wp_m_9_m_10.ports["e1"], m_10.ports["s"])
 
-    m_11 = c << t_proto
-    m_11.rotate(-90)
+    m_11 = c << get_transistor("m_11")
     m_11.center = grid_pos(6, -1)
 
     route_ni(m_10.ports["d"], m_11.ports["s"])
@@ -377,20 +381,28 @@ def full_adder(
         route_m_12_r_2.rotate(-90)
         route_m_12_r_2.connect("e1", m_12, "s", allow_width_mismatch=True)
 
-    route_ni(r_0.ports["top_e1"], r_3.ports["top_e1"])
-    route_ni(r_3.ports["top_e1"], r_1.ports["top_e1"])
-    route_ni(r_1.ports["top_e1"], r_2.ports["top_e1"])
+    if not split_vdd:
+        route_ni(r_0.ports["top_e1"], r_3.ports["top_e1"])
+        route_ni(r_3.ports["top_e1"], r_1.ports["top_e1"])
+        route_ni(r_1.ports["top_e1"], r_2.ports["top_e1"])
 
     #############
     # VDD / GND #
     #############
 
-    vdd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
-    gnd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+    if split_vdd:
+        for res in [r_0, r_1, r_2, r_3]:
+            vdd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+            vdd.connect("e4", res, "top_e1", allow_width_mismatch=True)
 
-    vdd.center = grid_pos(7, 1.5)
-    vdd.x += 20
-    route_ni(vdd.ports["e2"], r_2.ports["top_e1"])
+    else:
+        vdd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
+
+        vdd.center = grid_pos(7, 1.5)
+        vdd.x += 20
+        route_ni(vdd.ports["e2"], r_2.ports["top_e1"])
+
+    gnd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
 
     gnd.center = grid_pos(3, 0)
     gnd.ymax = b_in.y - wire_width / 2 - h_separation
@@ -420,6 +432,20 @@ def full_adder(
 
     route_ni(v_2.ports["top_e4"], m_13.ports["s"])
 
+    ### Quick Design Check
+
+    if (
+        (grid_h - m_0.bbox().height() - 2 * separation) < 2 * wire_width + h_separation
+    ) or (
+        (grid_w - m_0.bbox().width() - 2 * separation) < wire_width + 2 * h_separation
+    ):
+        old_c = c
+        c = gf.Component()
+        boundary = c << gf.components.rectangle(
+            (old_c.bbox().width(), old_c.bbox().height()), layer=LAYER.SI
+        )
+        boundary.center = old_c.center
+
     ########
     # Text #
     ########
@@ -429,7 +455,8 @@ def full_adder(
             text=f"Lm {l_mesa}\n"
             + f"Lg {l_gate}\n"
             + f"Ov {l_overlap}\n"
-            + f"Wm {w_mesa}\n",
+            + f"Wm {w_mesa}\n"
+            + f"D {' '.join(disabled).replace('_', '')}\n",
             size=15,
             layer=layer,
         )
@@ -443,20 +470,27 @@ def full_adder(
 def main():
     c = gf.Component()
 
-    variants = itertools.product(
-        [2, 5, 10],
-        [10, 20, 50, 100],
-        [5, 10, 20, 30],
+    t_variants = itertools.product(
+        [2, 5, 10, 20],  # l_ov
+        [5, 10, 20, 30],  # l_g
+        [10, 20, 50, 100],  # w
     )
 
+    t_variants = [(l_ov * 2 + l_g - 1, l_g, l_ov, w) for l_ov, l_g, w in t_variants]
+
     full_adders = [
-        full_adder(l_mesa=l_ov * 2 + l_g - 1, l_gate=l_g, l_overlap=l_ov, w_mesa=w)
-        for (l_ov, w, l_g) in variants
+        full_adder(l_mesa, l_gate, l_overlap, w_mesa)
+        for (l_mesa, l_gate, l_overlap, w_mesa) in t_variants
     ]
 
     c << gf.grid(gf.pack(full_adders, spacing=50))
 
-    # c << full_adder()
+    # c << full_adder(
+    #     l_mesa=70,
+    #     l_overlap=30,
+    #     disabled=["m_0", "m_1"],
+    #     split_vdd=True
+    # )
 
     c.show()
     c.write_gds("full_adder.gds")
