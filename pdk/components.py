@@ -247,7 +247,7 @@ def transistor(l_mesa=8.0, l_gate=2.0, l_overlap=2.0, w_mesa=12.0):
     mesa = c << gf.components.rectangle((l_mesa, w_mesa), layer=LAYER.ITO_CHANNEL)
 
     gate = c << gf.components.rectangle(
-        (l_gate + 2 * l_overlap, w_contact + 8), layer=LAYER.W_GATE
+        (l_gate + 2 * l_overlap, w_contact), layer=LAYER.W_GATE
     )
     gate.move(gate.center, mesa.center)
 

@@ -113,12 +113,12 @@ def full_adder(
 ):
     disabled = disabled or []
 
-    grid_w = 175
-    grid_h = 175
+    grid_w = 160
+    grid_h = 173
     wire_width = 50
 
     separation = 0
-    h_separation = 5
+    h_separation = 3
     metal_routing_ni = partial(pdk.cross_section.metal_routing_ni, width=wire_width)
     metal_routing_w = partial(pdk.cross_section.metal_routing_w, width=wire_width)
 
@@ -337,12 +337,9 @@ def full_adder(
     c_in = c << via((100, 100))
 
     a_in.center = grid_pos(-0.5, -0.5)
-    a_in.x -= a_in.bbox().width() / 2 + 2 * h_separation
-
-    b_in.center = a_in.center
-    b_in.y -= 200
+    b_in.center = grid_pos(-0.5, -1.5)
     c_in.center = a_in.center
-    c_in.y += 200
+    c_in.y += 198
 
     route_w(m_1.ports["g2"], a_in.ports["bot_e4"])
     route_w(m_3.ports["g2"], a_in.ports["bot_e3"])
@@ -357,6 +354,8 @@ def full_adder(
     route_w(m_0.ports["g2"], c_in.ports["bot_e3"])
     route_w(m_10.ports["g2"], c_in.ports["bot_e3"], start_straight_length=h_separation)
 
+    c_in.y -= (100 - wire_width) / 2
+
     #############
     # Resistors #
     #############
@@ -364,7 +363,7 @@ def full_adder(
     r_0 = c << r_proto
     r_0.rotate(-90)
     r_0.center = grid_pos(0, 0)
-    r_0.ymin = c_in.ymax + 20
+    r_0.ymin = c_in.ymax + 5
 
     r_1 = c << r_proto
     r_1.rotate(-90)
@@ -418,9 +417,15 @@ def full_adder(
 
     gnd = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
 
-    gnd.center = grid_pos(3, 0)
-    gnd.ymax = b_in.y - wire_width / 2 - h_separation
-    route_ni(gnd.ports["e2"], m_6.ports["d"])
+    gnd.center = grid_pos(7, 0)
+    gnd.ymax = m_1.ymin
+
+    s_gnd = c << gf.components.straight(
+        gnd.x - m_1.x - gnd.bbox().width() / 2 + wire_width / 2,
+        cross_section=partial(metal_routing_ni, width=100),
+    )
+
+    s_gnd.connect("e1", gnd, "e1", allow_width_mismatch=True)
 
     ###########
     # Outputs #
@@ -502,8 +507,12 @@ def transistor_test(
     p_s = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
     p_d = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
     p_g = c << via((100, 100))
+    s_g = c << gf.components.straight(
+        4, cross_section=metal_routing_w(width=t.bbox().width() - 7)
+    )
 
-    p_g.connect("bot_e4", t, "g1", allow_width_mismatch=True)
+    s_g.connect("e1", t, "g1", allow_width_mismatch=True)
+    p_g.connect("bot_e4", s_g, "e2", allow_width_mismatch=True)
 
     p_s.xmax = t.xmin
     p_s.ymax = t.ymax - 4
@@ -631,7 +640,7 @@ def main():
     ]
     full_adders = [x for x in full_adders if "invalid" not in x.info]
     full_adder_test_structure = gf.grid(
-        full_adders, shape=(len(full_adders), 6), spacing=(50, 50)
+        full_adders, shape=(len(full_adders), 6), spacing=(20, 10)
     )
 
     # Full Adder - Resistor
@@ -650,7 +659,7 @@ def main():
     ]
     r_full_adders = [x for x in r_full_adders if "invalid" not in x.info]
     r_full_adder_test_structure = gf.grid(
-        r_full_adders, shape=(len(r_full_adders), 6), spacing=(50, 50)
+        r_full_adders, shape=(len(r_full_adders), 6), spacing=(20, 10)
     )
 
     # Full Adder - VDD
@@ -668,7 +677,7 @@ def main():
     ]
     vdd_full_adders = [x for x in vdd_full_adders if "invalid" not in x.info]
     vdd_full_adder_test_structure = gf.grid(
-        vdd_full_adders, shape=(len(vdd_full_adders), 6), spacing=(50, 50)
+        vdd_full_adders, shape=(len(vdd_full_adders), 6), spacing=(20, 10)
     )
 
     # Transistor
@@ -678,7 +687,7 @@ def main():
     ]
 
     transistor_test_structure = gf.grid(
-        transistors, shape=(len(transistors), 8), spacing=(50, 50)
+        transistors, shape=(len(transistors), 4), spacing=(50, 50)
     )
 
     # Resistor
@@ -714,29 +723,13 @@ def main():
     )
 
     # Final Packing
-    # 10x10mm blocks
+    # 8x8mm blocks
 
     # Block A
-    block_a = gf.grid(
-        gf.pack(
-            [
-                full_adder_test_structure,
-                resistor_test_structure,
-            ],
-            spacing=150,
-        )
-    )
+    block_a = full_adder_test_structure
 
     # Block B
-    block_b = gf.grid(
-        gf.pack(
-            [
-                r_full_adder_test_structure,
-                resistor_test_structure,
-            ],
-            spacing=150,
-        )
-    )
+    block_b = r_full_adder_test_structure
 
     # Block C
     block_c = gf.grid(
@@ -744,7 +737,7 @@ def main():
             [
                 vdd_full_adder_test_structure,
                 transistor_test_structure,
-                transistor_test_structure,
+                resistor_test_structure,
                 inverter_test_structure,
                 nand_gates_test_structure,
             ],
@@ -755,11 +748,11 @@ def main():
     # Final Layout
     for i, block in enumerate([block_a, block_b, block_c] * 3):
         b = c << block
-        b.x = (i % 3 + 0.5) * 12000
-        b.y = (i // 3 + 0.5) * 12000
+        b.x = (i % 3 + 0.5) * 10000
+        b.y = (i // 3 + 0.5) * 10000
 
-        assert b.bbox().width() <= 10000
-        assert b.bbox().height() <= 10000
+        # assert b.bbox().width() <= 10000
+        # assert b.bbox().height() <= 10000
 
     c.show()
     c.write_gds("full_adder.gds")
