@@ -102,7 +102,7 @@ def resistor(
 
     pad_size = (12, width)
     resistor = c << resistance_meander(
-        pad_size=pad_size,
+        pad_size=(pad_size[0] + 2, pad_size[1]),
         num_squares=length,
         width=2,
         res_layer=layer,
@@ -159,23 +159,16 @@ def resistor(
 def resistor_ito(length=1, width=20):
     c = gf.Component()
 
-    if length * 3 < width or length <= 10:
-        offset = 6
-        trace_width = 2 if length >= 10 else 5
-        pad_size = (12, width)
-
-        r_size = (length * trace_width + 2 * offset, trace_width)
-        resistor = c << gf.components.compass(r_size, layer=LAYER.ITO_CHANNEL)
+    offset = 6
+    if length <= 1:
+        trace_width = width
     else:
-        offset = 6
-        pad_size = (12, width)
-        resistor = c << resistance_meander(
-            pad_size=(4, width),
-            num_squares=length,
-            width=5,
-            res_layer=LAYER.ITO_CHANNEL,
-            pad_layer=LAYER.ITO_CHANNEL,
-        )
+        trace_width = max(width / length, 3)
+
+    pad_size = (12, width)
+
+    r_size = (length * trace_width + 2 * offset, trace_width)
+    resistor = c << gf.components.compass(r_size, layer=LAYER.ITO_CHANNEL)
 
     v1 = c << via(pad_size)
     v2 = c << via(pad_size)

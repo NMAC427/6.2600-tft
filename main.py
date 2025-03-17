@@ -475,7 +475,7 @@ def full_adder(
             text=f"Lg {l_gate}\n"
             + f"Ov {l_overlap}\n"
             + f"Wm {w_mesa}\n"
-            + f"R {r_type[0]} {r_type[1]}\n"
+            + f"R {r_type[0][0]} {r_type[1]}\n"
             + (f"D {' '.join(disabled).replace('_', '')}\n" if disabled else ""),
             size=15,
             layer=layer,
@@ -508,7 +508,7 @@ def transistor_test(
     p_d = c << gf.components.pad((100, 100), layer=LAYER.NI_CONTACTS)
     p_g = c << via((100, 100))
     s_g = c << gf.components.straight(
-        4, cross_section=metal_routing_w(width=t.bbox().width() - 7)
+        6, cross_section=metal_routing_w(width=t.bbox().width() - 7)
     )
 
     s_g.connect("e1", t, "g1", allow_width_mismatch=True)
@@ -648,8 +648,8 @@ def main():
         itertools.product(
             [5, 10, 20, 40],  # l_g
             [5, 10],  # l_ov
-            [50, 100],  # w
-            [("W", 500), ("ITO", 1), ("ITO", 5), ("ITO", 10)],  # r_type
+            [20, 100],  # w
+            [("W", 500), ("ITO", 0.05), ("ITO", 0.1), ("ITO", 0.2)],  # r_type
         )
     )
 
@@ -694,7 +694,7 @@ def main():
     r_variants_w = [100, 200, 500, 1000, 2000, 5000, 10000]
     resistors_w = [resistor_w_test(l) for l in r_variants_w]
 
-    r_variants_ito = [1, 2, 5, 10, 20, 50, 100]
+    r_variants_ito = [0.05, 0.1, 0.2, 0.5, 1, 2, 5]
     resistors_ito = [resistor_ito_test(l) for l in r_variants_ito]
 
     resistors = resistors_w + resistors_ito
