@@ -15,7 +15,7 @@
   <xfill>false</xfill>
   <animation>0</animation>
   <name>Silicon (Si)</name>
-  <source>0/0@1</source>
+  <source>999/0@1</source>
  </properties>
 
  <properties>
@@ -33,7 +33,7 @@
   <xfill>false</xfill>
   <animation>0</animation>
   <name>Silicon Dioxide (SiO2)</name>
-  <source>1/0@1</source>
+  <source>998/0@1</source>
  </properties>
 
  <properties>
@@ -51,7 +51,7 @@
   <xfill>false</xfill>
   <animation>0</animation>
   <name>Tungsten Gate (W)</name>
-  <source>2/0@1</source>
+  <source>1/0@1</source>
  </properties>
 
  <properties>
@@ -69,7 +69,7 @@
   <xfill>false</xfill>
   <animation>0</animation>
   <name>Alumina (Al2O3)</name>
-  <source>3/0@1</source>
+  <source>2/0@1</source>
  </properties>
 
  <properties>
@@ -90,6 +90,7 @@
   <source>4/0@1</source>
  </properties>
 
+
  <properties>
   <frame-color>#FFD700</frame-color>
   <fill-color>#FFD700</fill-color>
@@ -105,6 +106,6 @@
   <xfill>false</xfill>
   <animation>0</animation>
   <name>Nickel Contacts (Ni)</name>
-  <source>5/0@1</source>
+  <source>3/0@1</source>
  </properties>
 </layer-properties>

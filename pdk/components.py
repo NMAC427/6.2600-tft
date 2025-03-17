@@ -177,7 +177,6 @@ def resistor_ito(length=1, width=20):
             pad_layer=LAYER.ITO_CHANNEL,
         )
 
-    print(length, width, pad_size)
     v1 = c << via(pad_size)
     v2 = c << via(pad_size)
 
