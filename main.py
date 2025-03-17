@@ -631,7 +631,7 @@ def main():
     ]
     full_adders = [x for x in full_adders if "invalid" not in x.info]
     full_adder_test_structure = gf.grid(
-        full_adders, shape=(len(full_adders), 8), spacing=(50, 50)
+        full_adders, shape=(len(full_adders), 6), spacing=(50, 50)
     )
 
     # Full Adder - Resistor
@@ -650,7 +650,7 @@ def main():
     ]
     r_full_adders = [x for x in r_full_adders if "invalid" not in x.info]
     r_full_adder_test_structure = gf.grid(
-        r_full_adders, shape=(len(r_full_adders), 8), spacing=(50, 50)
+        r_full_adders, shape=(len(r_full_adders), 6), spacing=(50, 50)
     )
 
     # Full Adder - VDD
@@ -668,7 +668,7 @@ def main():
     ]
     vdd_full_adders = [x for x in vdd_full_adders if "invalid" not in x.info]
     vdd_full_adder_test_structure = gf.grid(
-        vdd_full_adders, shape=(len(vdd_full_adders), 8), spacing=(50, 50)
+        vdd_full_adders, shape=(len(vdd_full_adders), 6), spacing=(50, 50)
     )
 
     # Transistor
@@ -688,9 +688,10 @@ def main():
     r_variants_ito = [1, 2, 5, 10, 20, 50, 100]
     resistors_ito = [resistor_ito_test(l) for l in r_variants_ito]
 
+    resistors = resistors_w + resistors_ito
     resistor_test_structure = gf.grid(
-        np.transpose([resistors_w, resistors_ito]).flatten().tolist(),
-        shape=(len(resistors_w), 2),
+        resistors,
+        shape=(len(resistors), 1),
         spacing=50,
     )
 
@@ -712,22 +713,53 @@ def main():
         nand_gates, shape=(len(nand_gates), 8), spacing=(50, 50)
     )
 
-    c << gf.grid(
+    # Final Packing
+    # 10x10mm blocks
+
+    # Block A
+    block_a = gf.grid(
         gf.pack(
             [
                 full_adder_test_structure,
+                resistor_test_structure,
+            ],
+            spacing=150,
+        )
+    )
+
+    # Block B
+    block_b = gf.grid(
+        gf.pack(
+            [
                 r_full_adder_test_structure,
+                resistor_test_structure,
+            ],
+            spacing=150,
+        )
+    )
+
+    # Block C
+    block_c = gf.grid(
+        gf.pack(
+            [
                 vdd_full_adder_test_structure,
                 transistor_test_structure,
                 transistor_test_structure,
-                resistor_test_structure,
-                resistor_test_structure,
                 inverter_test_structure,
                 nand_gates_test_structure,
             ],
             spacing=150,
         )
     )
+
+    # Final Layout
+    for i, block in enumerate([block_a, block_b, block_c] * 3):
+        b = c << block
+        b.x = (i % 3 + 0.5) * 12000
+        b.y = (i // 3 + 0.5) * 12000
+
+        assert b.bbox().width() <= 10000
+        assert b.bbox().height() <= 10000
 
     c.show()
     c.write_gds("full_adder.gds")
